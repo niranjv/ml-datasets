@@ -1,0 +1,1 @@
+Project directory structure is based on the one recommended by [Cookiecutter Data Science](https://drivendata.github.io/cookiecutter-data-science)
