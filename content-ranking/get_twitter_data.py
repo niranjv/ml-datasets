@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from dateutil import tz
 import logging
+import operator
 import os
 import sys
 
@@ -18,6 +19,10 @@ def main():
     now = datetime.now()
     now = now.replace(tzinfo=tz.tzlocal())
 
+    # Dictionary to store tweet & retweet count
+    # Assumption: can store dictionary in memory
+    tweet_retweet_dict = {}
+
     # Set up output file
     total_tweets = 0
     output_filepath = 'twitter_data.csv'
@@ -25,7 +30,7 @@ def main():
 
         # Get tweets from each of above sources from the past 24 hours
         for s in sources:
-            logger.info("Processing source:" + s)
+            logger.info("Processing source: " + s)
 
             num_tweets = 0
             for tweet in tweepy.Cursor(api.user_timeline, id=s).items():
@@ -33,16 +38,29 @@ def main():
                 tweet_text, tweet_time, retweet_count = process_tweet(tweet, logger)
                 
                 if (now - timedelta(hours=24) < tweet_time < now) and not tweet_text.startswith('https://t.co'):
-                    while (retweet_count > 0):
-                        outfile.write(tweet_text + '\n')
-                        retweet_count -= 1
 
-                    num_tweets += 1
+                    num_tweets += 1 
 
+                    # logger.info(tweet, retweet_count)
+                    if tweet_text in tweet_retweet_dict:
+                        tweet_retweet_dict[tweet_text] += retweet_count
+
+                    else:
+                        tweet_retweet_dict[tweet_text] = retweet_count
+
+                # Assumption: tweets are ordered by timestamp and we can stop processing at the first tweet that is past 24 hours
                 else:
                     logger.info("Got {} tweets from source '{}' in the past 24 hours".format(num_tweets, s))
                     total_tweets += num_tweets
                     break
+
+        # Write tweets to file in descending order of retweet volume
+        sorted_tweets = sorted(tweet_retweet_dict.items(), key=operator.itemgetter(1), reverse=True)
+        if (len(sorted_tweets) > 1000):
+            sorted_tweets = sorted_tweets[0:1000]
+
+        for (k,v) in sorted_tweets:
+            outfile.write('"{}",{}\n'.format(k, v)) # Topic, Retweet_count
 
 
 # -----
@@ -98,9 +116,11 @@ def setup_sources(logger):
     local_tv = ['nbcbayarea', 'abc7newsbayarea', 'KTVU', 'kron4news']
     other_news = ['HuffPost']
 
-    sources = national_newspapers + local_newspapers + national_tv + local_tv + other_news
+    new_sources = national_newspapers + local_newspapers + national_tv + local_tv + other_news
 
-    # sources = ['nytimes', 'washingtonpost']
+    # TODO: Add sources for other topics like politics, sports, religion, technology, business, entertainment, etc.
+
+    sources = news_sources
 
     return sources
 
@@ -118,6 +138,8 @@ def process_tweet(tweet, logger):
     rt_prefix = 'RT '
     if tweet_text.startswith(rt_prefix) and tweet_text.find(':') > 0:
         tweet_text = tweet_text[tweet_text.find(':')+2:]
+
+    tweet_text = tweet_text.replace('"', "'")
 
 
     # Convert tweet time from UTC to local time
