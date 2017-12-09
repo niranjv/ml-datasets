@@ -14,6 +14,7 @@ def main():
 
     locations = api.trends_available()
     woeid_dict = {}
+    woeid_dict[1] = 'Global'
     
     for loc in locations:
         country = loc['country']
@@ -21,16 +22,26 @@ def main():
         if country == 'United States' and place_name in bayarea_cities:
             woeid_dict[loc['woeid']] = place_name
 
-    for woeid, place_name in woeid_dict.items():
-        logger.info('Processing location {} ({})'.format(place_name, woeid))
-        response = api.trends_place(woeid)
-        trends = response[0]['trends']
+    # setup output file
+    output_filepath = 'twitter_trending_topics.csv'
+    with open(output_filepath, 'w') as outfile:
 
-        for t in trends:
-            tweet_volume = 'NA'
-            if t['tweet_volume'] is not None and t['tweet_volume'] != 'null':
-                tweet_volume = t['tweet_volume']
-            logger.info('{}: {} ({})'.format(place_name, t['name'], tweet_volume))
+        outfile.write('{},{},{}\n'.format('Place', 'Topic', 'Tweet_Volume'))
+
+        for woeid, place_name in woeid_dict.items():
+            logger.info('Processing location {} ({})'.format(place_name, woeid))
+            response = api.trends_place(woeid)
+            trends = response[0]['trends']
+
+            for t in trends:
+                tweet_volume = 'NA'
+                if t['tweet_volume'] is not None and t['tweet_volume'] != 'null':
+                    tweet_volume = t['tweet_volume']
+                logger.info('{}: {} ({})'.format(place_name, t['name'], tweet_volume))
+
+                outfile.write('{},{},{}\n'.format(place_name, t['name'], tweet_volume))
+
+            logger.info('')
 
         
 
